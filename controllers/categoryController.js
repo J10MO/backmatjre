@@ -564,6 +564,9 @@
 
 
 
+
+
+
 // const { pool } = require('../config/database');
 // const { redisClient } = require('../config/redis');
 
@@ -886,11 +889,9 @@
 
 
 
+
 const { pool } = require('../config/database');
 const { redisClient } = require('../config/redis');
-
-// احصل على BASE_URL من متغيرات البيئة
-const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
 
 // Helper functions for cache
 async function deleteFromCache(key) {
@@ -922,12 +923,28 @@ async function setToCache(key, data, expiry = 3600) {
   }
 }
 
-// دالة لتحويل الصور إلى URLs كاملة
-function addFullImageUrls(categories) {
-  return categories.map(cat => ({
-    ...cat,
-    image_url: cat.image_url ? `${BASE_URL}${cat.image_url}` : null
-  }));
+// دالة للتحقق من صحة URL
+function isValidImageUrl(url) {
+  if (!url) return false;
+  
+  try {
+    const parsedUrl = new URL(url);
+    const allowedProtocols = ['http:', 'https:'];
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg'];
+    
+    // التحقق من البروتوكول
+    if (!allowedProtocols.includes(parsedUrl.protocol)) {
+      return false;
+    }
+    
+    // التحقق من امتداد الملف (اختياري)
+    const pathname = parsedUrl.pathname.toLowerCase();
+    const hasValidExtension = allowedExtensions.some(ext => pathname.endsWith(ext));
+    
+    return hasValidExtension;
+  } catch (err) {
+    return false;
+  }
 }
 
 const categoryController = {
@@ -939,7 +956,7 @@ const categoryController = {
       // Check cache first
       const cached = await getFromCache(cacheKey);
       if (cached) {
-        return res.json(addFullImageUrls(cached));
+        return res.json(cached);
       }
       
       const result = await pool.query(`
@@ -953,21 +970,20 @@ const categoryController = {
       
       const categories = result.rows;
       
-      // Store in cache (بدون URLs كاملة)
+      // Store in cache
       await setToCache(cacheKey, categories, 3600);
       
-      // إرجاع البيانات مع URLs كاملة
-      res.json(addFullImageUrls(categories));
+      res.json(categories);
     } catch (err) {
       console.error('Error fetching categories:', err);
       res.status(500).json({ error: 'Server error' });
     }
   },
 
-  // Create new category (Admin only)
+  // Create new category (Admin only) - UPDATED FOR URL IMAGE
   async createCategory(req, res) {
     try {
-      const { name, name_ar, icon, color } = req.body;
+      const { name, name_ar, icon, color, image_url } = req.body;
 
       if (!name || !name_ar) {
         return res.status(400).json({ 
@@ -976,30 +992,28 @@ const categoryController = {
         });
       }
 
-      // Handle uploaded file - احفظ المسار النسبي فقط
-      let image_url = null;
-      if (req.file) {
-        image_url = `/uploads/categories/${req.file.filename}`;
+      // التحقق من صحة رابط الصورة إذا تم تقديمه
+      if (image_url && !isValidImageUrl(image_url)) {
+        return res.status(400).json({ 
+          error: 'Invalid image URL',
+          message: 'رابط الصورة غير صالح'
+        });
       }
 
       const result = await pool.query(
         `INSERT INTO categories (name, name_ar, icon, color, image_url) 
          VALUES ($1, $2, $3, $4, $5) 
          RETURNING *`,
-              [name, name_ar, icon || null, color || null, image_url]
+        [name, name_ar, icon || null, color || null, image_url || null]
       );
 
       // Clear categories cache
       await deleteFromCache('categories:all');
 
-      // إرجاع البيانات مع URL كامل
-      const category = result.rows<a href="" class="citation-link" target="_blank" style="vertical-align: super; font-size: 0.8em; margin-left: 3px;">[0]</a>;
-      category.image_url = category.image_url ? `${BASE_URL}${category.image_url}` : null;
-
       res.status(201).json({ 
         message: 'Category created successfully',
         message_ar: 'تم إنشاء التصنيف بنجاح',
-        category: category
+        category: result.rows[0] 
       });
     } catch (err) {
       console.error('Error creating category:', err);
@@ -1033,64 +1047,46 @@ const categoryController = {
         return res.status(404).json({ error: 'Category not found' });
       }
       
-      const category = result.rows<a href="" class="citation-link" target="_blank" style="vertical-align: super; font-size: 0.8em; margin-left: 3px;">[0]</a>;
-      category.image_url = category.image_url ? `${BASE_URL}${category.image_url}` : null;
-      
-      res.json(category);
+      res.json(result.rows[0]);
     } catch (err) {
       console.error('Error fetching category:', err);
       res.status(500).json({ error: 'Server error' });
     }
   },
 
-  // Update category (Admin only)
+  // Update category (Admin only) - UPDATED FOR URL IMAGE
   async updateCategory(req, res) {
     const { id } = req.params;
-    const { name, name_ar, icon, color } = req.body;
+    const { name, name_ar, icon, color, image_url } = req.body;
     
     try {
-      let query;
-      let queryParams;
-
-      if (req.file) {
-        // إذا كان هناك ملف جديد - احفظ المسار النسبي
-        query = `
-          UPDATE categories 
-          SET name = COALESCE($1, name),
-              name_ar = COALESCE($2, name_ar),
-              icon = COALESCE($3, icon),
-              color = COALESCE($4, color),
-              image_url = $5
-          WHERE id = $6
-          RETURNING *
-        `;
-        queryParams = [
-          name || null, 
-          name_ar || null, 
-          icon || null, 
-          color || null,
-          `/uploads/categories/${req.file.filename}`,
-          id
-        ];
-      } else {
-        // إذا لم يكن هناك ملف جديد
-        query = `
-          UPDATE categories 
-          SET name = COALESCE($1, name),
-              name_ar = COALESCE($2, name_ar),
-              icon = COALESCE($3, icon),
-              color = COALESCE($4, color)
-          WHERE id = $5
-          RETURNING *
-        `;
-        queryParams = [
-          name || null, 
-          name_ar || null, 
-          icon || null, 
-          color || null,
-          id
-        ];
+      // التحقق من صحة رابط الصورة إذا تم تقديمه
+      if (image_url && !isValidImageUrl(image_url)) {
+        return res.status(400).json({ 
+          error: 'Invalid image URL',
+          message: 'رابط الصورة غير صالح'
+        });
       }
+
+      const query = `
+        UPDATE categories 
+        SET name = COALESCE($1, name),
+            name_ar = COALESCE($2, name_ar),
+            icon = COALESCE($3, icon),
+            color = COALESCE($4, color),
+            image_url = COALESCE($5, image_url)
+        WHERE id = $6
+        RETURNING *
+      `;
+      
+      const queryParams = [
+        name || null, 
+        name_ar || null, 
+        icon || null, 
+        color || null,
+        image_url || null,
+        id
+      ];
 
       const result = await pool.query(query, queryParams);
       
@@ -1101,14 +1097,10 @@ const categoryController = {
       // Clear cache
       await deleteFromCache('categories:all');
       
-      // إرجاع البيانات مع URL كامل
-          const category = result.rows<a href="" class="citation-link" target="_blank" style="vertical-align: super; font-size: 0.8em; margin-left: 3px;">[0]</a>;
-      category.image_url = category.image_url ? `${BASE_URL}${category.image_url}` : null;
-      
       res.json({ 
         message: 'Category updated successfully',
         message_ar: 'تم تحديث التصنيف بنجاح',
-        category: category
+        category: result.rows[0] 
       });
     } catch (err) {
       console.error('Error updating category:', err);
@@ -1127,7 +1119,7 @@ const categoryController = {
         [id]
       );
       
-      if (parseInt(productsCheck.rows<a href="" class="citation-link" target="_blank" style="vertical-align: super; font-size: 0.8em; margin-left: 3px;">[0]</a>.count) > 0) {
+      if (parseInt(productsCheck.rows[0].count) > 0) {
         return res.status(400).json({ 
           error: 'Cannot delete category with products',
           message: 'لا يمكن حذف التصنيف لأنه يحتوي على منتجات'
@@ -1165,7 +1157,7 @@ const categoryController = {
     try {
       // Verify category exists
       const categoryCheck = await pool.query(
-        'SELECT id, name, name_ar, image_url FROM categories WHERE id = $1',
+        'SELECT id, name, name_ar FROM categories WHERE id = $1',
         [id]
       );
       
@@ -1208,14 +1200,10 @@ const categoryController = {
         'SELECT COUNT(*) FROM products WHERE category_id = $1 AND in_stock = true',
         [id]
       );
-      const totalCount = parseInt(countResult.rows<a href="" class="citation-link" target="_blank" style="vertical-align: super; font-size: 0.8em; margin-left: 3px;">[0]</a>.count);
-      
-      // تحويل image_url للتصنيف
-      const category = categoryCheck.rows<a href="" class="citation-link" target="_blank" style="vertical-align: super; font-size: 0.8em; margin-left: 3px;">[0]</a>;
-      category.image_url = category.image_url ? `${BASE_URL}${category.image_url}` : null;
+      const totalCount = parseInt(countResult.rows[0].count);
       
       res.json({
-                category: category,
+        category: categoryCheck.rows[0],
         products: result.rows,
         pagination: {
           total: totalCount,

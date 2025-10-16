@@ -31,23 +31,50 @@
 
 
 
+
+// const express = require('express');
+// const router = express.Router();
+// const authController = require('../controllers/authController');
+// const { authenticateJWT } = require('../middleware/');
+// const { authLimiter } = require('../middleware/rateLimit');
+
+// // Send OTP to phone number
+// router.post('/auth/send-otp', authLimiter, authController.sendOTP);
+
+// // Verify OTP and login/register
+// router.post('/auth/verify-otp', authLimiter, authController.verifyOTP);
+
+// // Resend OTP
+// router.post('/auth/resend-otp', authLimiter, authController.resendOTP);
+
+// // Profile routes
+// router.get('/auth/profile', authenticateJWT, authController.getProfile);
+// router.put('/auth/profile', authenticateJWT, authController.updateProfile);
+
+// module.exports = router;
+
+
+
+
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
-const { authenticateJWT } = require('../middleware/auth');
+
+const { authenticateJWT, isAdmin } = require('../middleware/auth');
 const { authLimiter } = require('../middleware/rateLimit');
 
-// Send OTP to phone number
+// ✅ Public routes - Authentication
 router.post('/auth/send-otp', authLimiter, authController.sendOTP);
-
-// Verify OTP and login/register
 router.post('/auth/verify-otp', authLimiter, authController.verifyOTP);
-
-// Resend OTP
 router.post('/auth/resend-otp', authLimiter, authController.resendOTP);
 
-// Profile routes
+// ✅ Protected routes - Profile
 router.get('/auth/profile', authenticateJWT, authController.getProfile);
 router.put('/auth/profile', authenticateJWT, authController.updateProfile);
+
+// ✅ Admin routes - User management
+router.post('/auth/promote-to-admin', authenticateJWT, isAdmin, authController.promoteToAdmin);
+router.post('/auth/change-role', authenticateJWT, isAdmin, authController.changeUserRole);
+
 
 module.exports = router;
