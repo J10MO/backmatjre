@@ -746,19 +746,45 @@
 
 
 
+// const { Pool } = require('pg');
+
+// const pool = new Pool({
+//   user: process.env.DB_USER || 'postgres',
+//   host: process.env.DB_HOST || 'localhost',
+//   database: process.env.DB_NAME || 'beauty_shop',
+//   password: process.env.DB_PASSWORD || 'password',
+//   port: process.env.DB_PORT || 5432,
+//   max: 20,
+//   idleTimeoutMillis: 30000,
+//   connectionTimeoutMillis: 2000,
+// });
+
+
 const { Pool } = require('pg');
 
+// For Render, use the external database URL or individual connection parameters
 const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'beauty_shop',
-  password: process.env.DB_PASSWORD || 'password',
-  port: process.env.DB_PORT || 5432,
+  connectionString: process.env.DATABASE_URL || 
+    `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`,
+  
+  // Render PostgreSQL requires SSL in production
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
 });
 
+// Test connection
+pool.on('connect', () => {
+  console.log('Connected to PostgreSQL database');
+});
+
+pool.on('error', (err) => {
+  console.error('Database connection error:', err);
+});
+
+// ... rest of your initialization code remains the same
 // Database initialization
 async function initDatabase() {
   try {
