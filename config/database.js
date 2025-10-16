@@ -1108,6 +1108,8 @@ async function initDatabase() {
       )
     `);
 
+    
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ads (
         id SERIAL PRIMARY KEY,
