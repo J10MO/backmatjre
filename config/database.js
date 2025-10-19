@@ -1020,6 +1020,15 @@
 
 
 
+
+
+
+
+
+
+
+
+
 const { Pool } = require('pg');
 
 // For Render, use the external database URL or individual connection parameters
@@ -1293,3 +1302,9 @@ setInterval(cleanExpiredOTPs, 60 * 60 * 1000);
 setInterval(updateAdsStatus, 30 * 60 * 1000);
 
 module.exports = { pool, initDatabase, cleanExpiredOTPs, updateAdsStatus };
+
+
+
+
+
+
