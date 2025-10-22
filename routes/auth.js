@@ -56,25 +56,48 @@
 
 
 
-const express = require('express');
-const router = express.Router();
-const authController = require('../controllers/authController');
+// const express = require('express');
+// const router = express.Router();
+// const authController = require('../controllers/authController');
 
-const { authenticateJWT, isAdmin } = require('../middleware/auth');
-const { authLimiter } = require('../middleware/rateLimit');
+// const { authenticateJWT, isAdmin } = require('../middleware/auth');
+// const { authLimiter } = require('../middleware/rateLimit');
+
+// // ✅ Public routes - Authentication
+// router.post('/auth/send-otp', authLimiter, authController.sendOTP);
+// router.post('/auth/verify-otp', authLimiter, authController.verifyOTP);
+// router.post('/auth/resend-otp', authLimiter, authController.resendOTP);
+
+// // ✅ Protected routes - Profile
+// router.get('/auth/profile', authenticateJWT, authController.getProfile);
+// router.put('/auth/profile', authenticateJWT, authController.updateProfile);
+
+// // ✅ Admin routes - User management
+// router.post('/auth/promote-to-admin', authenticateJWT, isAdmin, authController.promoteToAdmin);
+// router.post('/auth/change-role', authenticateJWT, isAdmin, authController.changeUserRole);
+
+
+// module.exports = router;
+
+
+
+const express = require("express")
+const router = express.Router()
+const authController = require("../controllers/authController")
+const { authenticateJWT, isAdmin } = require("../middleware/auth")
+const { authLimiter } = require("../middleware/rateLimit")
 
 // ✅ Public routes - Authentication
-router.post('/auth/send-otp', authLimiter, authController.sendOTP);
-router.post('/auth/verify-otp', authLimiter, authController.verifyOTP);
-router.post('/auth/resend-otp', authLimiter, authController.resendOTP);
+router.post("/auth/send-otp", authLimiter, authController.sendOTP)
+router.post("/auth/verify-otp", authLimiter, authController.verifyOTP)
+router.post("/auth/resend-otp", authLimiter, authController.resendOTP)
 
 // ✅ Protected routes - Profile
-router.get('/auth/profile', authenticateJWT, authController.getProfile);
-router.put('/auth/profile', authenticateJWT, authController.updateProfile);
+router.get("/auth/profile", authenticateJWT, authController.getProfile)
+router.put("/auth/profile", authenticateJWT, authController.updateProfile)
 
-// ✅ Admin routes - User management
-router.post('/auth/promote-to-admin', authenticateJWT, isAdmin, authController.promoteToAdmin);
-router.post('/auth/change-role', authenticateJWT, isAdmin, authController.changeUserRole);
+// These routes are now in the admin routes file:
+// - POST /admin/users/promote (was /auth/promote-to-admin)
+// - PUT /admin/users/:userId/role (was /auth/change-role)
 
-
-module.exports = router;
+module.exports = router
